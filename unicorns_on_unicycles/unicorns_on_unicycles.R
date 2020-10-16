@@ -137,7 +137,7 @@ dataset %>%
   ) 
 
 
-## Result: The correlation between unicorns and unicucle exists 
+## Result: The correlation between unicorns and bikes exists 
 ## The increase in unicorns population couse a siginficant increase in bikes sold in 1670s
 
 
