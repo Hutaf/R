@@ -1,8 +1,8 @@
-# load tidyverse library
 library(tidyverse)
+library(readxl)
+
 
 # load observations.xlsx
-library(readxl)
 url <- "https://github.com/mokainzi/R/blob/master/unicorns_on_unicycles/observations.xlsx?raw=true"
 destfile <- "observations.xlsx"
 curl::curl_download(url, destfile)
@@ -10,54 +10,134 @@ observations <- read_excel(destfile)
 View(observations)
 
 # load sales.xlsx
-library(readxl)
 url <- "https://github.com/mokainzi/R/blob/master/unicorns_on_unicycles/sales.xlsx?raw=true"
 destfile <- "sales.xlsx"
 curl::curl_download(url, destfile)
 sales <- read_excel(destfile)
-View(sales)
+
+# Print the first few rows in each dataset
+head(observations)
+head(sales)
 
 
-# rename observations country variable
-names(observations) [1] <- "country"
-View(observations)
+#### Step 1: Cleaning and preprocessing #####
 
-# separate sales into two objects, rename variables and 
-# transform country values to lowercase
-sales_bikes <- sales[, 1:3]
-names(sales_bikes) <- c("country", "year", "bikes")
-sales_bikes$country <- str_to_title(sales_bikes$country)
-View(sales_bikes)
+# Check if all the records are NA for columns 4 & 5 (Contains no relevent data)
+sum(is.na(sales$...4))
+sum(is.na(sales$...5))
 
-sales_total_turnover <- sales[, 6:8]
-names(sales_total_turnover) <- c("country", "year", "total_turnover")
-sales_total_turnover$country <- str_to_title(sales_total_turnover$country)
-View(sales_total_turnover)
+# Same observations
+identical(sales$name_of_country...1,sales$name_of_country...6)
+identical(sales$year...2,sales$year...7)
+identical(sales$year...2, observations$year)
+
+# Same observations but the difference is upper case
+identical(sales$name_of_country...1, observations$countryname)
+table(observations$countryname)
+table(sales$name_of_country...1)
+
+# Drop unrelevent columns
+drop <- c("name_of_country...6","year...7","...4", "...5")
+sales <- sales[ , !(names(sales) %in% drop)]
+str(sales)
+
+# rename some columns
+names(sales)<- c("country", "year", "bikes","total_turnover")
+str(sales)
+names(observations) <- c("country", "year", "pop")
+
+# Convert country in observations to uppercase
+observations$country <- toupper(observations$country)
+# same observations
+identical(sales$country, observations$country)
+
+# full-join to combine 2 datasets
+dataset <- observations %>%
+  full_join(sales, by = c("country", "year"))
+str(dataset)
+View(dataset)
+
+#### Step 2: Univariate visualization #####
 
 
-# full-join observations, sales_bikes and sales_total_turnover by country and year
-df <- observations %>%
-  full_join(sales_bikes, by = c("country", "year")) %>%
-  full_join(sales_total_turnover, by = c("country", "year"))
-View(df)
-
-# bar chart of average bike prices across European countries
-df %>%
-  mutate(bike_price = total_turnover/bikes) %>%
-  group_by(country) %>%
-  summarise(bike_price = mean(bike_price)) %>%
-  ggplot(aes(x = country, y = bike_price, fill = bike_price)) + 
-  geom_col()
-
-# plot to visualize the relation between unicorns and unicycles
-df %>%
-  ggplot(aes(x = pop, y = bikes, group = country, color = country)) +
-  geom_point() +
+# Plot unicorn population for each country
+dataset %>% 
+  ggplot() +
+  geom_line(aes(year, pop, group = country))+
+  geom_point(aes(year, pop, color = country))+
   labs(
-    title = "Unicorns Vs. Unicycle Sales",
-    subtitle = "The more unicorns exist the more unicycles are soled in\nthe 17th century in western Europe",
-    x = "Unicorns",
-    y = "Unicycle Sales",
-    color = "Country"
-  ) + 
-  theme_bw()
+    title = "Unicorns population for each country",
+    x = "Year",
+    y = "Unicorns Population")
+
+# Plot total_turnover for each country in 1670s
+dataset %>% 
+  ggplot() +
+  geom_line(aes(year, total_turnover, color = country))+
+  labs(
+    title = "Total turnover for each country",
+    x = "Year",
+    y = "Total Turnover")
+
+# Plot the number of bikes sold in 1670s for each country
+dataset %>% 
+  ggplot() +
+  geom_line(aes(year, bikes, color = country))+
+  labs(
+    title = "Bikes sold for each country in 1670s",
+    x = "Year",
+    y = "Bikes")
+
+# Plot the years of observations for each country
+dataset %>% 
+  ggplot() +
+  geom_line(aes(year, country))
+
+## This shows that only Austria who has records in 1670, while other countrie's records are missing
+## if the data is large enough I would drop this year to make better observation but the data is small.
+
+#### Step 3: Bivariate visualization #####
+
+## Q1: Is there a correlation between unicorns population and number of bikes sold in 1670s ?
+
+# Plot a country wise disribution of unicorns
+dataset %>%
+  ggplot() +
+  geom_boxplot(aes(country, pop,color = country))+
+  labs(
+    title = "country wise disribution of unicorn"
+  )
+
+# Plot a country wise disribution of bikes
+dataset %>%
+  ggplot() +
+  geom_boxplot(aes(country, bikes,color = country))+
+  labs(
+    title = "country wise disribution of bikes"
+  )
+
+# Plot the relation between unicorns and unicycles
+dataset %>%
+  ggplot(aes(pop,bikes, color = country)) +
+  geom_boxplot() +
+  labs(
+    title = "Country wise distbution of unicorns & bikes sold in 1670s",
+    x = "Unicorns population",
+    y = "Bikes"
+  )  
+
+
+dataset %>% 
+  ggplot() +
+  geom_line(aes(pop, bikes, color = country))+
+  labs(
+    title = "Country wise distbution of unicorns & bikes sold in 1670s",
+    x = "Unicorns population",
+    y = "Bikes"
+  ) 
+
+
+## Result: The correlation between unicorns and unicucle exists 
+## The increase in unicorns population couse a siginficant increase in bikes sold in 1670s
+
+
